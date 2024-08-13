@@ -1,0 +1,5 @@
+{
+  "name": "@vik/tinyresult",
+  "version": "0.1.0",
+  "exports": "./src/lib.ts"
+}
