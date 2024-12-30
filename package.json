@@ -4,17 +4,14 @@
   "type": "module",
   "scripts": {
     "format": "prettier --write \"**/*.{ts,js}\"",
-    "test": "node --import tsx --test src/tests.test.ts"
+    "test": "node --experimental-strip-types --test tests/*"
   },
   "exports": {
     ".": "./src/lib.ts"
   },
   "devDependencies": {
-    "@types/node": "^20.14.12",
+    "@types/node": "22.4.1",
     "prettier": "3.3.2",
-    "tsx": "^4.16.2"
-  },
-  "dependencies": {
-    "typescript": "^5.5.4"
+    "typescript": "5.5.4"
   }
 }

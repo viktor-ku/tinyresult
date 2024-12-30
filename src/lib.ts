@@ -2,6 +2,7 @@ const C_RESULT_OK = 1
 const C_RESULT_ERROR = 2
 const C_OPTION_SOME = 3
 const C_OPTION_NONE = 4
+
 const C_TAG_INDEX = 2
 
 export type ResultOk<T> = readonly [T, false, typeof C_RESULT_OK]
@@ -36,14 +37,14 @@ export function isErr<T, E>(it: Result<T, E>): it is ResultErr<E> {
   return it[C_TAG_INDEX] === C_RESULT_ERROR
 }
 
-export type OptionSome<T> = readonly [T, true, typeof C_OPTION_SOME]
-export type OptionNone = readonly [null, false, typeof C_OPTION_NONE]
+export type OptionSome<T> = readonly [T, false, typeof C_OPTION_SOME]
+export type OptionNone = readonly [null, true, typeof C_OPTION_NONE]
 export type Option<T> = OptionSome<T> | OptionNone
 
-const C_NONE = [null, false, C_OPTION_NONE] as const
+const C_NONE = [null, true, C_OPTION_NONE] as const
 
 export function Some<T>(value: T): OptionSome<T> {
-  return [value, true, C_OPTION_SOME]
+  return [value, false, C_OPTION_SOME]
 }
 
 export function None(): OptionNone {
@@ -58,7 +59,13 @@ export function isNone<T>(it: Option<T>): it is OptionNone {
   return it[C_TAG_INDEX] === C_OPTION_NONE
 }
 
-export function unwrap<T, E = unknown>(it: Result<T, E> | Option<T>): T {
+type Fallback<T, E> = (error?: E) => T
+type Expected<E> = (error?: E) => Error
+
+export function unwrap<T, E>(
+  it: Result<T, E> | Option<T>,
+  expected?: Error | string | Expected<E>
+): T {
   const tag = it[C_TAG_INDEX]
 
   if (tag === C_RESULT_OK || tag === C_OPTION_SOME) {
@@ -66,20 +73,35 @@ export function unwrap<T, E = unknown>(it: Result<T, E> | Option<T>): T {
   }
 
   if (tag === C_OPTION_NONE) {
+    if (expected instanceof Error) {
+      throw expected
+    } else if (typeof expected === "string") {
+      throw new Error(expected)
+    } else if (typeof expected === "function") {
+      throw expected()
+    }
     throw new Error("Could not unwrap() None")
   }
 
   const e = it[1]
 
-  // TODO: throw in a various weird ways
-  //
+  if (expected instanceof Error) {
+    expected.cause ??= e
+    throw expected
+  } else if (typeof expected === "string") {
+    throw new Error(expected, { cause: e })
+  } else if (typeof expected === "function") {
+    const throwable = expected(e)
+    throwable.cause ??= e
+    throw throwable
+  }
 
-  throw e
+  throw new Error("Could not unwrap() Result", { cause: e })
 }
 
-export function expect<T, E = unknown>(
+export function unwrapOr<T, E>(
   it: Result<T, E> | Option<T>,
-  error: string | Error
+  fallback: Fallback<T, E> | T
 ): T {
   const tag = it[C_TAG_INDEX]
 
@@ -87,39 +109,10 @@ export function expect<T, E = unknown>(
     return it[0]
   }
 
-  const is_error = error instanceof Error
+  const f =
+    typeof fallback === "function"
+      ? (fallback as Fallback<T, E>)
+      : () => fallback
 
-  if (tag === C_OPTION_NONE) {
-    throw is_error ? error : new Error(error)
-  }
-
-  const it_error = it[1]
-
-  if (is_error && it_error) {
-    error.cause = it_error
-  }
-
-  throw is_error ? error : new Error(error, { cause: it_error ?? undefined })
-}
-
-export function unwrapOr<T, E = unknown>(
-  it: Result<T, E> | Option<T>,
-  fallback: T
-): T {
-  try {
-    return unwrap(it)
-  } catch {
-    return fallback
-  }
-}
-
-export function unwrapOrElse<T, E = unknown>(
-  it: Result<T, E> | Option<T>,
-  fallback: (it: ResultErr<E> | OptionNone) => T
-): T {
-  try {
-    return unwrap(it)
-  } catch {
-    return fallback(it as ResultErr<E> | OptionNone)
-  }
+  return tag === C_OPTION_NONE ? f() : f(it[1])
 }
