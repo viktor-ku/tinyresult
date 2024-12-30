@@ -92,7 +92,3 @@ Viva the machine revolution hehe
    (todo: forced by eslint)
 3. You must handle errors/values or pass them upstream (forced by typescript)
 4. All your `Result<T, E>` `E` results should be objects with `code` as the discriminator property
-
-## How
-
-Show me the code - you scream at the screen, and I hear you!
